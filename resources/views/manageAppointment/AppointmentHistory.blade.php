@@ -5,6 +5,15 @@
 @section('content')
     @php
         $appointments = $appointments ?? [];
+        $userRole = session('user_role', '');
+        // Get parent children from layout (available in all views)
+        $parentChildren = $parentChildren ?? collect([]);
+        $selectedChildId = request()->input('child_id');
+        
+        // If no child selected and multiple children exist, get first child
+        if (!$selectedChildId && $parentChildren->count() > 0 && $userRole === 'parent') {
+            $selectedChildId = $parentChildren->first()->ChildID ?? null;
+        }
     @endphp
 
     <style>
@@ -37,6 +46,57 @@
             color: #1a1a1a;
             font-size: 16px;
             font-weight: 500;
+        }
+
+        /* Child Selector for Multiple Children */
+        .child-selector {
+            background: linear-gradient(135deg, #ffffff 0%, #fff8fa 100%);
+            border: 2px solid #ffe0e8;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(255, 158, 179, 0.1);
+        }
+
+        .child-selector-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .child-selector-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .child-selector-btn {
+            padding: 12px 24px;
+            border: 2px solid #ffe0e8;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #fff5f5 0%, #ffe0e9 100%);
+            color: #1a1a1a;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .child-selector-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 111, 145, 0.2);
+            border-color: #ff9eb3;
+        }
+
+        .child-selector-btn.active {
+            background: linear-gradient(135deg, #ff6f91 0%, #ff9eb3 100%);
+            color: white;
+            border-color: #ff6f91;
         }
 
         .appointment-list {
@@ -181,22 +241,131 @@
         }
 
         @media (max-width: 768px) {
+            .appointment-history-wrapper {
+                padding: 20px 10px;
+            }
+
+            .appointment-history-header {
+                margin-bottom: 25px;
+            }
+
+            .appointment-history-title {
+                font-size: 24px;
+            }
+
+            .child-selector {
+                padding: 16px 12px;
+                margin-bottom: 20px;
+            }
+
+            .child-selector-title {
+                font-size: 16px;
+                margin-bottom: 12px;
+            }
+
+            .child-selector-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .child-selector-btn {
+                width: 100%;
+                text-align: center;
+                padding: 14px 20px;
+                font-size: 13px;
+            }
+
+            .appointment-list {
+                gap: 16px;
+            }
+
             .appointment-card {
                 flex-direction: column;
-                gap: 20px;
+                gap: 16px;
+                padding: 20px 16px;
             }
 
             .appointment-status {
                 align-self: flex-end;
+                margin-left: 0;
+                padding: 8px 16px;
+                font-size: 11px;
             }
 
             .appointment-details {
                 grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .date-time-container {
+                grid-column: span 1;
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .appointment-field {
+                min-height: 50px;
+            }
+
+            .appointment-label {
+                font-size: 11px;
+                height: 18px;
+            }
+
+            .appointment-value {
+                font-size: 14px;
+            }
+
+            .empty-state {
+                padding: 60px 15px;
+            }
+
+            .empty-state-icon {
+                font-size: 48px;
+            }
+
+            .empty-state-text {
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .appointment-history-wrapper {
+                padding: 15px 8px;
+            }
+
+            .appointment-history-title {
+                font-size: 20px;
+            }
+
+            .child-selector {
+                padding: 14px 10px;
+            }
+
+            .child-selector-title {
+                font-size: 14px;
+            }
+
+            .child-selector-btn {
+                padding: 12px 16px;
+                font-size: 12px;
+            }
+
+            .appointment-card {
+                padding: 16px 12px;
+            }
+
+            .appointment-label {
+                font-size: 10px;
+            }
+
+            .appointment-value {
+                font-size: 13px;
             }
 
             .appointment-status {
-                margin-left: 0;
-                align-self: flex-end;
+                padding: 6px 12px;
+                font-size: 10px;
             }
         }
     </style>
@@ -205,6 +374,20 @@
         <div class="appointment-history-header">
             <h2 class="appointment-history-title">📅 Appointment History</h2>
         </div>
+
+        @if($userRole === 'parent' && $parentChildren->count() > 1)
+            <div class="child-selector">
+                <div class="child-selector-title">👶 Select Child</div>
+                <div class="child-selector-buttons">
+                    @foreach($parentChildren as $child)
+                        <a href="{{ route('parent.appointment.history') }}?child_id={{ $child->ChildID }}" 
+                           class="child-selector-btn {{ ($selectedChildId == $child->ChildID || (!$selectedChildId && $loop->first)) ? 'active' : '' }}">
+                            {{ $child->ChildID }} - {{ $child->FullName }}
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        @endif
 
         @if(count($appointments) > 0)
             <div class="appointment-list">
@@ -249,7 +432,13 @@
         @else
             <div class="empty-state">
                 <div class="empty-state-icon">📋</div>
-                <div class="empty-state-text">No appointment history available.</div>
+                <div class="empty-state-text">
+                    @if($userRole === 'parent' && $parentChildren->count() > 1)
+                        No appointment history available for the selected child.
+                    @else
+                        No appointment history available.
+                    @endif
+                </div>
             </div>
         @endif
     </div>

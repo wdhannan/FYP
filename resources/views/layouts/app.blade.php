@@ -669,7 +669,7 @@
     <div class="header">
         <div class="header-left">
             @php
-                $logoPath = asset('logo.jpg');
+                $logoPath = asset('images/logo.jpg');
             @endphp
             <img src="{{ $logoPath }}" alt="Logo" class="logo" onerror="this.onerror=null; this.style.display='none';">
             <h1 class="header-title">Digital Child Health Record System</h1>
@@ -1078,6 +1078,142 @@
             box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
         }
         
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .header {
+                height: 70px;
+                padding: 0 15px 0 60px;
+            }
+
+            .logo {
+                width: 50px;
+                height: 50px;
+            }
+
+            .header-title {
+                font-size: 14px;
+                font-weight: 600;
+            }
+
+            .header-left {
+                gap: 10px;
+            }
+
+            .sidebar-toggle {
+                top: 15px;
+                left: 15px;
+                width: 40px;
+                height: 40px;
+            }
+
+            .sidebar-toggle-icon {
+                width: 20px;
+                height: 20px;
+            }
+
+            .sidebar {
+                width: 260px;
+                padding-top: 70px;
+                box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
+            }
+
+            .sidebar.collapsed {
+                transform: translateX(-100%);
+            }
+
+            .main-content {
+                margin-left: 0;
+                margin-top: 70px;
+                padding: 20px 15px;
+                width: 100%;
+            }
+
+            .main-content.sidebar-collapsed {
+                margin-left: 0;
+            }
+
+            .nav-item {
+                padding: 14px 20px;
+                font-size: 14px;
+            }
+
+            .nav-icon {
+                width: 20px;
+                height: 20px;
+            }
+
+            .nav-text {
+                font-size: 14px;
+            }
+
+            .dropdown-item {
+                padding: 12px 15px 12px 50px;
+                font-size: 13px;
+            }
+
+            .user-icon {
+                width: 28px;
+                height: 28px;
+            }
+
+            .chevron-down {
+                width: 18px;
+                height: 18px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                height: 60px;
+                padding: 0 10px 0 55px;
+            }
+
+            .logo {
+                width: 40px;
+                height: 40px;
+            }
+
+            .header-title {
+                font-size: 12px;
+            }
+
+            .sidebar-toggle {
+                top: 12px;
+                left: 12px;
+                width: 36px;
+                height: 36px;
+            }
+
+            .sidebar {
+                width: 240px;
+                padding-top: 60px;
+            }
+
+            .main-content {
+                margin-top: 60px;
+                padding: 15px 10px;
+            }
+
+            .nav-item {
+                padding: 12px 15px;
+                font-size: 13px;
+            }
+
+            .nav-icon {
+                width: 18px;
+                height: 18px;
+            }
+
+            .nav-text {
+                font-size: 13px;
+            }
+
+            .dropdown-item {
+                padding: 10px 12px 10px 45px;
+                font-size: 12px;
+            }
+        }
+
         @media (max-width: 600px) {
             .message-modal {
                 padding: 40px 30px;
@@ -1281,6 +1417,28 @@
             const isCollapsed = sidebar.classList.contains('collapsed');
             localStorage.setItem('sidebarCollapsed', isCollapsed);
         }
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const isMobile = window.innerWidth <= 768;
+            
+            if (isMobile && sidebar && !sidebar.classList.contains('collapsed')) {
+                // Check if click is outside sidebar and toggle button
+                if (!sidebar.contains(event.target) && !sidebarToggle.contains(event.target)) {
+                    sidebar.classList.add('collapsed');
+                    const mainContent = document.getElementById('mainContent');
+                    if (mainContent) {
+                        mainContent.classList.add('sidebar-collapsed');
+                    }
+                    const toggleIcon = document.getElementById('sidebarToggleIcon');
+                    if (toggleIcon) {
+                        toggleIcon.classList.remove('rotated');
+                    }
+                }
+            }
+        });
 
         // Restore sidebar state on page load
         document.addEventListener('DOMContentLoaded', function() {

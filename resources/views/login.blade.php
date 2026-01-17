@@ -17,7 +17,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background-image: url("{{ asset('background.png') }}");
+            background-image: url("{{ asset('images/background.png') }}");
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -237,7 +237,7 @@
 <body>
     <div class="login-container">
         <div class="logo-section">
-            <img src="{{ asset('logo.jpg') }}" alt="Logo" class="logo-image">
+            <img src="{{ asset('images/logo.jpg') }}" alt="Logo" class="logo-image">
             <h1 class="system-title">Digital Child Health Record System</h1>
         </div>
             

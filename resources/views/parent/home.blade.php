@@ -205,15 +205,127 @@
 
         @media (max-width: 768px) {
             .parent-dashboard {
-                padding: 20px;
+                padding: 15px 10px;
             }
 
-            .dashboard-content {
-                grid-template-columns: 1fr;
+            .dashboard-header {
+                margin-bottom: 25px;
+            }
+
+            .dashboard-title {
+                font-size: 20px;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .health-overview-card {
+                padding: 20px 15px;
+                margin-bottom: 25px;
+            }
+
+            .health-overview-title {
+                font-size: 18px;
+                margin-bottom: 16px;
             }
 
             .health-overview-grid {
                 grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .overview-item {
+                padding: 16px;
+            }
+
+            .overview-label {
+                font-size: 11px;
+                margin-bottom: 6px;
+            }
+
+            .overview-value {
+                font-size: 20px;
+            }
+
+            .dashboard-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .dashboard-card {
+                padding: 20px 15px;
+            }
+
+            .card-title {
+                font-size: 18px;
+                margin-bottom: 16px;
+            }
+
+            .list-item {
+                padding: 12px 15px;
+                margin-bottom: 10px;
+            }
+
+            .item-title {
+                font-size: 14px;
+            }
+
+            .item-details {
+                font-size: 13px;
+            }
+
+            .item-date {
+                font-size: 11px;
+            }
+
+            .empty-state {
+                padding: 30px 15px;
+            }
+
+            .empty-state-icon {
+                font-size: 40px;
+            }
+
+            .empty-state-text {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .parent-dashboard {
+                padding: 10px 8px;
+            }
+
+            .dashboard-title {
+                font-size: 18px;
+                line-height: 1.4;
+            }
+
+            .health-overview-card {
+                padding: 16px 12px;
+            }
+
+            .health-overview-title {
+                font-size: 16px;
+            }
+
+            .overview-item {
+                padding: 14px;
+            }
+
+            .overview-value {
+                font-size: 18px;
+            }
+
+            .dashboard-card {
+                padding: 16px 12px;
+            }
+
+            .card-title {
+                font-size: 16px;
+            }
+
+            .list-item {
+                padding: 10px 12px;
             }
         }
     </style>

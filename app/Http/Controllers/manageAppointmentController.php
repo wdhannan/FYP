@@ -375,13 +375,10 @@ class manageAppointmentController extends Controller
                 ->orderBy('appointment.time', 'desc')
                 ->get();
             
-            // Use parent view if parent, otherwise use general view
-            $viewName = ($userRole === 'parent') ? 'parent.AppointmentHistory' : 'manageAppointment.AppointmentHistory';
-            
-            return view($viewName, compact('appointments'));
+            // Use unified view for all roles
+            return view('manageAppointment.AppointmentHistory', compact('appointments'));
         } catch (\Exception $e) {
-            $viewName = (session('user_role') === 'parent') ? 'parent.AppointmentHistory' : 'manageAppointment.AppointmentHistory';
-            return view($viewName, ['appointments' => collect([])])
+            return view('manageAppointment.AppointmentHistory', ['appointments' => collect([])])
                 ->with('error', 'Error loading appointment history: ' . $e->getMessage());
         }
     }
