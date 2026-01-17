@@ -80,9 +80,6 @@
                             
                             // Show success popup with details
                             let popupMessage = '✅ SUCCESS!\n\n' + message;
-                            if (data.count > 0) {
-                                popupMessage += '\n\n📧 Registration emails with temporary passwords have been sent to all registered nurses.';
-                            }
                             alert(popupMessage);
                             
                             // Reload all nurses from database to show complete list

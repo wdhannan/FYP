@@ -90,22 +90,8 @@ Route::post('/login', function (\Illuminate\Http\Request $request) {
 })->name('login.post');
 
 Route::get('/password/change', function () {
-    // Check if user is authenticated
-    if (!session('authenticated')) {
-        return redirect()->route('login')->withErrors([
-            'id' => 'Please login first.',
-        ]);
-    }
-    
-    // Check if user must change password
-    $userId = session('user_id');
-    $user = DB::table('user')->where('UserID', $userId)->first();
-    
-    if (!$user || !$user->must_change_password) {
-        return redirect()->route('home');
-    }
-    
-    return view('change-password');
+    // Middleware already checks authentication, so just redirect to reset password page
+    return redirect()->route('password.reset');
 })->middleware('auth.check')->name('password.change');
 
 Route::post('/password/change', function (\Illuminate\Http\Request $request) {
@@ -160,8 +146,9 @@ Route::post('/password/change', function (\Illuminate\Http\Request $request) {
 })->middleware('auth.check')->name('password.change.post');
 
 Route::get('/password/reset', function () {
+    // Middleware already checks authentication
     return view('forgot-password');
-})->name('password.reset');
+})->middleware('auth.check')->name('password.reset');
 
 Route::post('/password/reset', function (\Illuminate\Http\Request $request) {
     $request->validate([
@@ -179,7 +166,7 @@ Route::post('/password/reset', function (\Illuminate\Http\Request $request) {
     }
 
     // Find user by UserID from session
-    $user = \App\Models\User::where('UserID', $userId)->first();
+    $user = DB::table('user')->where('UserID', $userId)->first();
 
     if (!$user) {
         return back()->withErrors([
@@ -187,13 +174,26 @@ Route::post('/password/reset', function (\Illuminate\Http\Request $request) {
         ]);
     }
 
-    // Update password (storing as plain text as per your current system)
-    $user->PasswordHash = $request->new_password;
-    $user->must_change_password = false; // Also reset the flag if it was set
-    $user->save();
+    // Check if this is a first-time password change
+    $isFirstTimeChange = $user->must_change_password ?? false;
 
+    // Update password (storing as plain text as per your current system)
+    DB::table('user')
+        ->where('UserID', $userId)
+        ->update([
+            'PasswordHash' => $request->new_password,
+            'must_change_password' => false,
+            'updated_at' => now(),
+        ]);
+
+    // If this was a required first-time password change, redirect to home
+    if ($isFirstTimeChange) {
+        return redirect()->route('home')->with('success', 'Password has been changed successfully! You can now access the system.');
+    }
+
+    // Otherwise, stay on reset page with success message
     return redirect()->route('password.reset')->with('success', 'Password has been changed successfully!');
-})->name('password.reset.post');
+})->middleware('auth.check')->name('password.reset.post');
 
 Route::get('/home', function () {
     // Get user role from session (default to 'nurse' if not set)

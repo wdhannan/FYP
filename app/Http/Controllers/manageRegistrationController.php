@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use App\Models\Parent;
+use App\Models\Parent as ParentModel;
 use App\Models\Child;
 use App\Helpers\PasswordHelper;
 use App\Mail\ParentRegistrationMail;
@@ -80,7 +80,7 @@ class manageRegistrationController extends Controller
                 $parentID = 'P' . str_pad($nextParentNumber, 3, '0', STR_PAD_LEFT);
 
                 // Create new parent record
-                Parent::create([
+                ParentModel::create([
                     'ParentID' => $parentID,
                     'MotherName' => $request->mother_name,
                     'MphoneNumber' => $request->mother_phone,
@@ -601,7 +601,7 @@ class manageRegistrationController extends Controller
                             $parentID = 'P' . str_pad($nextParentNumber, 3, '0', STR_PAD_LEFT);
                             
                             // Create new parent record
-                            Parent::create([
+                            ParentModel::create([
                                 'ParentID' => $parentID,
                                 'MotherName' => $motherName,
                                 'MphoneNumber' => $mPhoneNumber,

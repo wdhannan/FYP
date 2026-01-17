@@ -21,8 +21,9 @@ class CheckAuth
             ]);
         }
 
-        // Check if user must change password (except on password change page itself)
-        if (!$request->routeIs('password.change') && !$request->routeIs('password.change.post')) {
+        // Check if user must change password (except on password change/reset pages)
+        if (!$request->routeIs('password.change') && !$request->routeIs('password.change.post') 
+            && !$request->routeIs('password.reset') && !$request->routeIs('password.reset.post')) {
             $userId = session('user_id');
             if ($userId) {
                 $user = \Illuminate\Support\Facades\DB::table('user')->where('UserID', $userId)->first();
