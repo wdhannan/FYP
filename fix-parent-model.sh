@@ -32,12 +32,21 @@ else
     echo "  -> ParentModel.php found ✓"
 fi
 
-# Step 4: Remove all Laravel cache files
-echo "Step 4: Removing Laravel cache files..."
-rm -rf bootstrap/cache/*.php
-rm -rf storage/framework/cache/*
-rm -rf storage/framework/views/*
-rm -rf storage/framework/sessions/*
+# Step 4: Create necessary directories and remove cache files
+echo "Step 4: Setting up cache directories..."
+mkdir -p storage/framework/cache
+mkdir -p storage/framework/views
+mkdir -p storage/framework/sessions
+mkdir -p bootstrap/cache
+chmod -R 775 storage/framework
+chmod -R 775 bootstrap/cache
+echo "  -> Cache directories created/verified"
+
+echo "Step 4b: Removing Laravel cache files..."
+rm -rf bootstrap/cache/*.php 2>/dev/null || true
+rm -rf storage/framework/cache/* 2>/dev/null || true
+rm -rf storage/framework/views/* 2>/dev/null || true
+rm -rf storage/framework/sessions/* 2>/dev/null || true
 echo "  -> Cache files removed"
 
 # Step 5: Regenerate Composer autoload (CRITICAL)
@@ -47,12 +56,12 @@ echo "  -> Composer autoload regenerated ✓"
 
 # Step 6: Clear all Laravel caches
 echo "Step 6: Clearing Laravel caches..."
-php artisan optimize:clear
-php artisan config:clear
-php artisan cache:clear
-php artisan route:clear
-php artisan view:clear
-php artisan event:clear
+php artisan config:clear || true
+php artisan cache:clear || true
+php artisan route:clear || true
+php artisan view:clear || true
+php artisan event:clear || true
+php artisan optimize:clear || true
 echo "  -> All caches cleared ✓"
 
 # Step 7: Rebuild optimized caches
