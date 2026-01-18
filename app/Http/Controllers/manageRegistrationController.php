@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use App\Models\Parent as ParentModel;
+use App\Models\ParentModel;
 use App\Models\Child;
 use App\Helpers\PasswordHelper;
 use App\Mail\ParentRegistrationMail;
