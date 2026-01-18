@@ -790,23 +790,22 @@ class manageRegistrationController extends Controller
                 }
             }
 
+            // Log errors for debugging but don't show them to user
+            if (count($errors) > 0) {
+                \Log::info('Child CSV Upload - Some rows had errors: ' . count($errors), ['errors' => $errors]);
+            }
+
             if ($successCount > 0) {
                 $message = "✅ Successfully registered {$successCount} child(ren)! Registration emails are being sent.";
             } else {
                 $message = "No children were registered.";
-            }
-            
-            if (count($errors) > 0) {
-                $message .= "\n\n⚠️ " . count($errors) . " error(s) occurred during registration.";
             }
 
             return response()->json([
                 'success' => true,
                 'message' => $message,
                 'count' => $successCount,
-                'children' => $children ?? [],
-                'errors' => $errors,
-                'errorCount' => count($errors)
+                'children' => $children ?? []
             ]);
         } catch (\Exception $e) {
             \Log::error('CSV Upload Error: ' . $e->getMessage());

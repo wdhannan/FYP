@@ -213,23 +213,22 @@ class manageUserController extends Controller
                 }
             }
 
+            // Log errors for debugging but don't show them to user
+            if (count($errors) > 0) {
+                \Log::info('Doctor CSV Upload - Some rows had errors: ' . count($errors), ['errors' => $errors]);
+            }
+
             if ($successCount > 0) {
                 $message = "✅ Successfully registered {$successCount} doctor(s)! Registration emails are being sent.";
             } else {
                 $message = "No doctors were registered.";
-            }
-            
-            if (count($errors) > 0) {
-                $message .= "\n\n⚠️ " . count($errors) . " error(s) occurred during registration.";
             }
 
             return response()->json([
                 'success' => true,
                 'message' => $message,
                 'count' => $successCount,
-                'doctors' => $doctors,
-                'errors' => $errors,
-                'errorCount' => count($errors)
+                'doctors' => $doctors
             ]);
         } catch (\Exception $e) {
             \Log::error('Doctor CSV Upload Error: ' . $e->getMessage());
@@ -476,23 +475,22 @@ class manageUserController extends Controller
                 }
             }
 
+            // Log errors for debugging but don't show them to user
+            if (count($errors) > 0) {
+                \Log::info('Nurse CSV Upload - Some rows had errors: ' . count($errors), ['errors' => $errors]);
+            }
+
             if ($successCount > 0) {
                 $message = "✅ Successfully registered {$successCount} nurse(s)! Registration emails are being sent.";
             } else {
                 $message = "No nurses were registered.";
-            }
-            
-            if (count($errors) > 0) {
-                $message .= "\n\n⚠️ " . count($errors) . " error(s) occurred during registration.";
             }
 
             return response()->json([
                 'success' => true,
                 'message' => $message,
                 'count' => $successCount,
-                'nurses' => $nurses,
-                'errors' => $errors,
-                'errorCount' => count($errors)
+                'nurses' => $nurses
             ]);
         } catch (\Exception $e) {
             \Log::error('Nurse CSV Upload Error: ' . $e->getMessage());
