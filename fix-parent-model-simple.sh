@@ -24,12 +24,27 @@ if [ ! -f "app/Models/ParentModel.php" ]; then
 fi
 echo "  -> ParentModel.php found ✓"
 
-# Step 4: Manually remove cache files (works even with permission issues)
-echo "Step 4: Manually removing cache files..."
-rm -f bootstrap/cache/*.php 2>/dev/null
-rm -rf storage/framework/cache/data/* 2>/dev/null
-rm -rf storage/framework/views/* 2>/dev/null
-echo "  -> Cache files removed ✓"
+# Step 4: Manually remove ALL cache files (CRITICAL - cached files may contain old Parent references)
+echo "Step 4: Manually removing ALL cache files..."
+# Remove bootstrap cache files (these often contain class references)
+find bootstrap/cache -name "*.php" -type f -delete 2>/dev/null || true
+rm -f bootstrap/cache/*.php 2>/dev/null || true
+rm -f bootstrap/cache/routes-*.php 2>/dev/null || true
+rm -f bootstrap/cache/config.php 2>/dev/null || true
+rm -f bootstrap/cache/services.php 2>/dev/null || true
+rm -f bootstrap/cache/packages.php 2>/dev/null || true
+
+# Remove compiled views (may contain old class references)
+find storage/framework/views -name "*.php" -type f -delete 2>/dev/null || true
+rm -rf storage/framework/views/* 2>/dev/null || true
+
+# Remove application cache
+rm -rf storage/framework/cache/data/* 2>/dev/null || true
+
+# Remove sessions (optional, but helps)
+rm -rf storage/framework/sessions/* 2>/dev/null || true
+
+echo "  -> ALL cache files removed ✓"
 
 # Step 5: Regenerate Composer autoload (MOST IMPORTANT)
 echo "Step 5: Regenerating Composer autoload..."
