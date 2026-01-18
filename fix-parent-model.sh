@@ -32,22 +32,35 @@ else
     echo "  -> ParentModel.php found ✓"
 fi
 
-# Step 4: Create necessary directories and remove cache files
-echo "Step 4: Setting up cache directories..."
+# Step 4: Fix permissions and create necessary directories
+echo "Step 4: Setting up cache directories and fixing permissions..."
+
+# Get the application owner (usually smart3938 based on previous commands)
+APP_OWNER=$(stat -c '%U' . 2>/dev/null || echo "smart3938")
+
+echo "  -> Application owner: $APP_OWNER"
+
+# Create directories if they don't exist
 mkdir -p storage/framework/cache
 mkdir -p storage/framework/views
 mkdir -p storage/framework/sessions
 mkdir -p bootstrap/cache
-chmod -R 775 storage/framework
-chmod -R 775 bootstrap/cache
-echo "  -> Cache directories created/verified"
+mkdir -p storage/logs
+
+# Set ownership and permissions
+chown -R $APP_OWNER:$APP_OWNER storage bootstrap/cache 2>/dev/null || true
+chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+chmod -R 775 storage/framework bootstrap/cache 2>/dev/null || true
+
+echo "  -> Cache directories created/verified with proper permissions"
 
 echo "Step 4b: Removing Laravel cache files..."
+# Remove cache files (might fail due to permissions, that's OK)
 rm -rf bootstrap/cache/*.php 2>/dev/null || true
 rm -rf storage/framework/cache/* 2>/dev/null || true
 rm -rf storage/framework/views/* 2>/dev/null || true
 rm -rf storage/framework/sessions/* 2>/dev/null || true
-echo "  -> Cache files removed"
+echo "  -> Cache files removed (if accessible)"
 
 # Step 5: Regenerate Composer autoload (CRITICAL)
 echo "Step 5: Regenerating Composer autoload..."
