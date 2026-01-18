@@ -334,6 +334,7 @@ class manageRegistrationController extends Controller
             $children = [];
             $successCount = 0;
             $errors = [];
+            $validRows = [];
 
             if (($handle = fopen($path, 'r')) !== false) {
                 // Read and validate header row
@@ -493,7 +494,9 @@ class manageRegistrationController extends Controller
                     ], 400);
                 }
                 
-                $rowNumber = 1; // Track row number for better error messages
+                // Step 1: Read all CSV rows into memory and validate
+                $csvRows = [];
+                $rowNumber = 1;
                 
                 while (($data = fgetcsv($handle)) !== false) {
                     $rowNumber++;
@@ -524,17 +527,13 @@ class manageRegistrationController extends Controller
                     $fIdentificationNumber = $getColumnValue('fIdentificationNumber');
                     
                     // Validate required fields
-                    if (empty($childFullName) || empty($dateOfBirth) || empty($gender)) {
+                    if (empty($childFullName) || empty($dateOfBirth) || empty($gender) || empty($motherName)) {
                         $missing = [];
                         if (empty($childFullName)) $missing[] = 'ChildFullName';
                         if (empty($dateOfBirth)) $missing[] = 'DateOfBirth';
                         if (empty($gender)) $missing[] = 'Gender';
-                        $errors[] = "Row {$rowNumber}: Missing required child information (" . implode(', ', $missing) . ")";
-                        continue;
-                    }
-                    
-                    if (empty($motherName)) {
-                        $errors[] = "Row {$rowNumber}: Missing required parent information (MotherName)";
+                        if (empty($motherName)) $missing[] = 'MotherName';
+                        $errors[] = "Row {$rowNumber}: Missing required fields: " . implode(', ', $missing);
                         continue;
                     }
                     
@@ -565,160 +564,247 @@ class manageRegistrationController extends Controller
                         continue;
                     }
                     
-                    DB::beginTransaction();
+                    $csvRows[] = [
+                        'row' => $rowNumber,
+                        'childFullName' => $childFullName,
+                        'dateOfBirth' => $dateOfBirthObj->format('Y-m-d'),
+                        'gender' => $genderNormalized,
+                        'myKidNumber' => $myKidNumber,
+                        'ethnic' => $ethnic,
+                        'motherName' => $motherName,
+                        'mPhoneNumber' => $mPhoneNumber,
+                        'mEmail' => $mEmail,
+                        'mIdentificationNumber' => $mIdentificationNumber,
+                        'fatherName' => $fatherName,
+                        'fPhoneNumber' => $fPhoneNumber,
+                        'fEmail' => $fEmail,
+                        'fIdentificationNumber' => $fIdentificationNumber,
+                    ];
+                }
+                fclose($handle);
+                
+                if (empty($csvRows)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No valid rows found in CSV file.'
+                    ], 400);
+                }
+                
+                // Step 2: Batch check existing records
+                $motherICs = array_filter(array_column($csvRows, 'mIdentificationNumber'));
+                $fatherICs = array_filter(array_column($csvRows, 'fIdentificationNumber'));
+                $myKidNumbers = array_filter(array_column($csvRows, 'myKidNumber'));
+                
+                $existingParents = DB::table('parent')
+                    ->whereIn('MIdentificationNumber', $motherICs)
+                    ->orWhereIn('FIdentificationNumber', $fatherICs)
+                    ->get()
+                    ->keyBy(function($item) {
+                        return ($item->MIdentificationNumber ?? '') . '|' . ($item->FIdentificationNumber ?? '');
+                    });
+                
+                $existingChildren = DB::table('child')
+                    ->whereIn('MyKidNumber', $myKidNumbers)
+                    ->pluck('MyKidNumber', 'MyKidNumber')
+                    ->toArray();
+                
+                // Step 3: Pre-calculate ParentIDs and ChildIDs
+                $maxParentID = DB::table('parent')
+                    ->whereRaw("ParentID REGEXP '^P[0-9]+$'")
+                    ->selectRaw("CAST(SUBSTRING(ParentID, 2) AS UNSIGNED) as num")
+                    ->orderBy('num', 'desc')
+                    ->value('num') ?? 0;
+                
+                $maxChildID = DB::table('child')
+                    ->whereRaw("ChildID REGEXP '^C[0-9]+$'")
+                    ->selectRaw("CAST(SUBSTRING(ChildID, 2) AS UNSIGNED) as num")
+                    ->orderBy('num', 'desc')
+                    ->value('num') ?? 0;
+                
+                // Step 4: Process rows and group by parent
+                $parentMap = []; // Maps IC to ParentID
+                $parentsToInsert = [];
+                $childrenToInsert = [];
+                $usersToInsert = [];
+                $emailsToQueue = [];
+                $nextParentNum = $maxParentID;
+                $nextChildNum = $maxChildID;
+                $now = now();
+                
+                foreach ($csvRows as $row) {
+                    $rowNumber = $row['row'];
+                    $myKidNumber = $row['myKidNumber'];
                     
-                    try {
-                        // Check if parent already exists by IC number
-                        $existingParent = null;
-                        
-                        // First, check by Mother's IC if provided
-                        if (!empty($mIdentificationNumber)) {
-                            $existingParent = DB::table('parent')
-                                ->where('MIdentificationNumber', $mIdentificationNumber)
-                                ->first();
+                    // Check if child already exists
+                    if (!empty($myKidNumber) && isset($existingChildren[$myKidNumber])) {
+                        $errors[] = "Row {$rowNumber}: Child with MyKidNumber '{$myKidNumber}' already exists";
+                        continue;
+                    }
+                    
+                    // Find or create parent
+                    $parentKey = ($row['mIdentificationNumber'] ?? '') . '|' . ($row['fIdentificationNumber'] ?? '');
+                    $parentID = null;
+                    $isNewParent = false;
+                    
+                    // Check existing parents
+                    foreach ($existingParents as $existingParent) {
+                        $match = false;
+                        if (!empty($row['mIdentificationNumber']) && $existingParent->MIdentificationNumber === $row['mIdentificationNumber']) {
+                            $match = true;
                         }
-                        
-                        // If not found, check by Father's IC if provided
-                        if (!$existingParent && !empty($fIdentificationNumber)) {
-                            $existingParent = DB::table('parent')
-                                ->where('FIdentificationNumber', $fIdentificationNumber)
-                                ->first();
+                        if (!empty($row['fIdentificationNumber']) && $existingParent->FIdentificationNumber === $row['fIdentificationNumber']) {
+                            $match = true;
                         }
-                        
-                        $isNewParent = false;
-                        if ($existingParent) {
-                            // Use existing ParentID
+                        if ($match) {
                             $parentID = $existingParent->ParentID;
-                        } else {
-                            // Generate new ParentID
-                            $maxParentID = DB::table('parent')
-                                ->whereRaw("ParentID REGEXP '^P[0-9]+$'")
-                                ->selectRaw("CAST(SUBSTRING(ParentID, 2) AS UNSIGNED) as num")
-                                ->orderBy('num', 'desc')
-                                ->value('num');
+                            break;
+                        }
+                    }
+                    
+                    // Create new parent if not found
+                    if (!$parentID) {
+                        if (!isset($parentMap[$parentKey])) {
+                            $nextParentNum++;
+                            $parentID = 'P' . str_pad($nextParentNum, 3, '0', STR_PAD_LEFT);
+                            $parentMap[$parentKey] = $parentID;
                             
-                            $nextParentNumber = ($maxParentID ?? 0) + 1;
-                            $parentID = 'P' . str_pad($nextParentNumber, 3, '0', STR_PAD_LEFT);
-                            
-                            // Create new parent record
-                            ParentModel::create([
+                            $parentsToInsert[] = [
                                 'ParentID' => $parentID,
-                                'MotherName' => $motherName,
-                                'MphoneNumber' => $mPhoneNumber,
-                                'MEmail' => $mEmail,
-                                'MIdentificationNumber' => $mIdentificationNumber,
-                                'FatherName' => $fatherName,
-                                'FPhoneNumber' => $fPhoneNumber,
-                                'FEmail' => $fEmail,
-                                'FIdentificationNumber' => $fIdentificationNumber,
-                            ]);
+                                'MotherName' => $row['motherName'],
+                                'MphoneNumber' => $row['mPhoneNumber'],
+                                'MEmail' => $row['mEmail'],
+                                'MIdentificationNumber' => $row['mIdentificationNumber'],
+                                'FatherName' => $row['fatherName'],
+                                'FPhoneNumber' => $row['fPhoneNumber'],
+                                'FEmail' => $row['fEmail'],
+                                'FIdentificationNumber' => $row['fIdentificationNumber'],
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ];
+                            
                             $isNewParent = true;
-                        }
-                        
-                        // Generate ChildID
-                        $maxChildID = DB::table('child')
-                            ->whereRaw("ChildID REGEXP '^C[0-9]+$'")
-                            ->selectRaw("CAST(SUBSTRING(ChildID, 2) AS UNSIGNED) as num")
-                            ->orderBy('num', 'desc')
-                            ->value('num');
-                        
-                        $nextChildNumber = ($maxChildID ?? 0) + 1;
-                        $childID = 'C' . str_pad($nextChildNumber, 3, '0', STR_PAD_LEFT);
-                        
-                        // Check if child already exists (by MyKidNumber if provided)
-                        if (!empty($myKidNumber)) {
-                            $existingChild = DB::table('child')
-                                ->where('MyKidNumber', $myKidNumber)
-                                ->first();
                             
-                            if ($existingChild) {
-                                DB::rollBack();
-                                $errors[] = "Row {$rowNumber}: Child with MyKidNumber '{$myKidNumber}' already exists";
-                                continue;
-                            }
-                        }
-                        
-                        // Create child record
-                        Child::create([
-                            'ChildID' => $childID,
-                            'FullName' => $childFullName,
-                            'DateOfBirth' => $dateOfBirthObj->format('Y-m-d'),
-                            'Gender' => $genderNormalized,
-                            'MyKidNumber' => $myKidNumber ?: null,
-                            'Ethnic' => $ethnic ?: null,
-                            'ParentID' => $parentID,
-                        ]);
-                        
-                        // Create user account for parent if doesn't exist and email is provided
-                        $parentEmail = !empty($mEmail) ? $mEmail : (!empty($fEmail) ? $fEmail : null);
-                        if ($parentEmail && $isNewParent) {
-                            // Check if user account already exists for this parent
-                            $existingUser = DB::table('user')->where('UserID', $parentID)->first();
-                            
-                            if (!$existingUser) {
-                                // Generate temporary password
+                            // Prepare user account if email provided
+                            $parentEmail = !empty($row['mEmail']) ? $row['mEmail'] : (!empty($row['fEmail']) ? $row['fEmail'] : null);
+                            if ($parentEmail) {
                                 $temporaryPassword = PasswordHelper::generateTemporaryPassword(8);
-                                
-                                // Create user account for parent using ParentID as UserID
-                                DB::table('user')->insert([
+                                $usersToInsert[] = [
                                     'UserID' => $parentID,
-                                    'PasswordHash' => $temporaryPassword, // Store plain text (as per current system)
+                                    'PasswordHash' => $temporaryPassword,
                                     'role' => 'parent',
-                                    'must_change_password' => true, // Force password change on first login
-                                    'created_at' => now(),
-                                    'updated_at' => now(),
-                                ]);
+                                    'must_change_password' => true,
+                                    'created_at' => $now,
+                                    'updated_at' => $now,
+                                ];
                                 
-                                // Send email to parent with temporary password
-                                try {
-                                    $parentName = !empty($motherName) ? $motherName : (!empty($fatherName) ? $fatherName : 'Parent');
-                                    Mail::to($parentEmail)->send(new ParentRegistrationMail(
-                                        $parentName,
-                                        $parentID,
-                                        $parentEmail,
-                                        $temporaryPassword,
-                                        $childFullName
-                                    ));
-                                } catch (\Exception $emailError) {
-                                    // Log email error but don't fail the registration
-                                    \Log::error('Failed to send parent registration email: ' . $emailError->getMessage());
-                                }
+                                $emailsToQueue[] = [
+                                    'email' => $parentEmail,
+                                    'parentName' => !empty($row['motherName']) ? $row['motherName'] : (!empty($row['fatherName']) ? $row['fatherName'] : 'Parent'),
+                                    'parentID' => $parentID,
+                                    'password' => $temporaryPassword,
+                                    'childName' => $row['childFullName'],
+                                ];
                             }
+                        } else {
+                            $parentID = $parentMap[$parentKey];
                         }
+                    }
+                    
+                    // Generate ChildID
+                    $nextChildNum++;
+                    $childID = 'C' . str_pad($nextChildNum, 3, '0', STR_PAD_LEFT);
+                    
+                    $childrenToInsert[] = [
+                        'ChildID' => $childID,
+                        'FullName' => $row['childFullName'],
+                        'DateOfBirth' => $row['dateOfBirth'],
+                        'Gender' => $row['gender'],
+                        'MyKidNumber' => $myKidNumber ?: null,
+                        'Ethnic' => $row['ethnic'] ?: null,
+                        'ParentID' => $parentID,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+                
+                // Step 5: Bulk insert in single transaction
+                if (!empty($childrenToInsert)) {
+                    DB::beginTransaction();
+                    try {
+                        if (!empty($parentsToInsert)) {
+                            DB::table('parent')->insert($parentsToInsert);
+                        }
+                        
+                        if (!empty($usersToInsert)) {
+                            DB::table('user')->insert($usersToInsert);
+                        }
+                        
+                        DB::table('child')->insert($childrenToInsert);
                         
                         DB::commit();
                         
-                        $children[] = [
-                            'ChildID' => $childID,
-                            'FullName' => $childFullName,
-                            'DateOfBirth' => $dateOfBirthObj->format('Y-m-d'),
-                            'Gender' => $genderNormalized,
-                            'ParentID' => $parentID,
-                            'MotherName' => $motherName,
-                            'FatherName' => $fatherName
-                        ];
-                        $successCount++;
+                        // Step 6: Queue emails asynchronously (don't block response)
+                        foreach ($emailsToQueue as $emailData) {
+                            try {
+                                if (config('queue.default') !== 'sync') {
+                                    Mail::to($emailData['email'])->queue(new ParentRegistrationMail(
+                                        $emailData['parentName'],
+                                        $emailData['parentID'],
+                                        $emailData['email'],
+                                        $emailData['password'],
+                                        $emailData['childName']
+                                    ));
+                                } else {
+                                    // Send email (non-blocking in production with proper mail config)
+                                    Mail::to($emailData['email'])->send(new ParentRegistrationMail(
+                                        $emailData['parentName'],
+                                        $emailData['parentID'],
+                                        $emailData['email'],
+                                        $emailData['password'],
+                                        $emailData['childName']
+                                    ));
+                                }
+                            } catch (\Exception $e) {
+                                \Log::error("Failed to send email for parent {$emailData['parentID']}: " . $e->getMessage());
+                            }
+                        }
+                        
+                        $successCount = count($childrenToInsert);
+                        $children = array_map(function($item) {
+                            return [
+                                'ChildID' => $item['ChildID'],
+                                'FullName' => $item['FullName'],
+                                'DateOfBirth' => $item['DateOfBirth'],
+                                'Gender' => $item['Gender'],
+                                'ParentID' => $item['ParentID'],
+                            ];
+                        }, $childrenToInsert);
                         
                     } catch (\Exception $e) {
                         DB::rollBack();
-                        $childNameDisplay = !empty($childFullName) ? $childFullName : 'Unknown';
-                        $errors[] = "Row {$rowNumber}: Error processing child '{$childNameDisplay}' - " . $e->getMessage();
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Error inserting data: ' . $e->getMessage()
+                        ], 500);
                     }
                 }
-                fclose($handle);
             }
 
             if ($successCount > 0) {
-                $message = "✅ Successfully registered {$successCount} child(ren)! All children have been added to the system.";
+                $message = "✅ Successfully registered {$successCount} child(ren)! Registration emails are being sent.";
             } else {
                 $message = "No children were registered.";
+            }
+            
+            if (count($errors) > 0) {
+                $message .= "\n\n⚠️ " . count($errors) . " error(s) occurred during registration.";
             }
 
             return response()->json([
                 'success' => true,
                 'message' => $message,
                 'count' => $successCount,
-                'children' => $children,
+                'children' => $children ?? [],
                 'errors' => $errors,
                 'errorCount' => count($errors)
             ]);
