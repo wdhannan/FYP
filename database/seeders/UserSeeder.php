@@ -15,7 +15,7 @@ class UserSeeder extends Seeder
     {
         $users = [
             [
-                'UserID' => 1,
+                'UserID' => 'admin',
                 'PasswordHash' => 'admin123',
                 'role' => 'admin',
                 'created_at' => now(),
@@ -57,7 +57,7 @@ class UserSeeder extends Seeder
         $this->command->table(
             ['UserID', 'Role', 'Password'],
             [
-                ['1', 'admin', 'admin123'],
+                ['admin', 'admin', 'admin123'],
                 ['2', 'doctor', 'doctor123'],
                 ['3', 'nurse', 'nurse123'],
                 ['4', 'parent', 'parent123'],
