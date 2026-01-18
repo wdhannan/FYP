@@ -9,6 +9,7 @@ use App\Models\Appointment;
 use App\Models\Child;
 use App\Models\Doctor;
 use App\Models\Nurse;
+use App\Models\ParentModel;
 use App\Mail\AppointmentReminderMail;
 use App\Mail\AppointmentRequestMail;
 
