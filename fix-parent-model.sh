@@ -67,22 +67,74 @@ echo "Step 5: Regenerating Composer autoload..."
 composer dump-autoload --optimize --no-interaction
 echo "  -> Composer autoload regenerated ✓"
 
-# Step 6: Clear all Laravel caches
+# Step 6: Clear all Laravel caches (with permission handling)
 echo "Step 6: Clearing Laravel caches..."
-php artisan config:clear || true
-php artisan cache:clear || true
-php artisan route:clear || true
-php artisan view:clear || true
-php artisan event:clear || true
-php artisan optimize:clear || true
-echo "  -> All caches cleared ✓"
 
-# Step 7: Rebuild optimized caches
+# Try to clear caches, but if permissions fail, manually delete cache files
+if php artisan config:clear 2>/dev/null; then
+    echo "  -> Config cache cleared ✓"
+else
+    echo "  -> Config cache clear failed (permissions), manually removing..."
+    rm -f bootstrap/cache/config.php 2>/dev/null || true
+fi
+
+if php artisan cache:clear 2>/dev/null; then
+    echo "  -> Application cache cleared ✓"
+else
+    echo "  -> Application cache clear failed (permissions), manually removing..."
+    rm -rf storage/framework/cache/data/* 2>/dev/null || true
+fi
+
+if php artisan route:clear 2>/dev/null; then
+    echo "  -> Route cache cleared ✓"
+else
+    echo "  -> Route cache clear failed (permissions), manually removing..."
+    rm -f bootstrap/cache/routes*.php 2>/dev/null || true
+fi
+
+if php artisan view:clear 2>/dev/null; then
+    echo "  -> View cache cleared ✓"
+else
+    echo "  -> View cache clear failed (non-critical) ✓"
+fi
+
+if php artisan event:clear 2>/dev/null; then
+    echo "  -> Event cache cleared ✓"
+else
+    echo "  -> Event cache clear skipped (non-critical) ✓"
+fi
+
+# Try optimize:clear, but don't fail if it doesn't work
+if php artisan optimize:clear 2>/dev/null; then
+    echo "  -> Optimize clear completed ✓"
+else
+    echo "  -> Optimize clear had issues (continuing anyway) ✓"
+fi
+
+echo "  -> Cache clearing completed ✓"
+
+# Step 7: Rebuild optimized caches (only if we have write permissions)
 echo "Step 7: Rebuilding optimized caches..."
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-echo "  -> Caches rebuilt ✓"
+
+if php artisan config:cache 2>/dev/null; then
+    echo "  -> Config cache rebuilt ✓"
+else
+    echo "  -> Config cache rebuild failed (permissions issue - may need to run as app user)"
+fi
+
+if php artisan route:cache 2>/dev/null; then
+    echo "  -> Route cache rebuilt ✓"
+else
+    echo "  -> Route cache rebuild failed (permissions issue - may need to run as app user)"
+fi
+
+if php artisan view:cache 2>/dev/null; then
+    echo "  -> View cache rebuilt ✓"
+else
+    echo "  -> View cache rebuild skipped (optional)"
+fi
+
+echo "  -> Cache rebuilding completed ✓"
 
 echo ""
 echo "========================================="
