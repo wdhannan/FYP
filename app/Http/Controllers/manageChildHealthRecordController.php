@@ -605,6 +605,7 @@ class manageChildHealthRecordController extends Controller
                     'MilestoneID' => $milestoneID,
                     'ChildID' => $childId,
                     'MilestoneType' => $milestoneType,
+                    'RecordedDate' => !empty($recordedDates[$index]) ? $recordedDates[$index] : null,
                     'Notes' => $notes[$index] ?? null,
                 ]);
                 

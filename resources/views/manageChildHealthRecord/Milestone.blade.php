@@ -345,7 +345,15 @@
                             <tr>
                                 <td>{{ $milestone->ChildName ?? 'N/A' }}</td>
                                 <td>{{ $milestone->MilestoneType ?? 'N/A' }}</td>
-                                <td>{{ $milestone->RecordedDate ?? 'N/A' }}</td>
+                                <td>
+                                    @if(!empty($milestone->RecordedDate))
+                                        {{ \Carbon\Carbon::parse($milestone->RecordedDate)->format('F j, Y') }}
+                                    @elseif(!empty($milestone->created_at))
+                                        {{ \Carbon\Carbon::parse($milestone->created_at)->format('F j, Y') }}
+                                    @else
+                                        N/A
+                                    @endif
+                                </td>
                                 <td>{{ $milestone->Notes ?? '-' }}</td>
                             </tr>
                         @endforeach
