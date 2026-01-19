@@ -116,8 +116,10 @@ class manageRegistrationController extends Controller
             ]);
 
             // Create user account for parent if email is provided and this is a new parent
-            $parentEmail = !empty($request->mother_email) ? $request->mother_email : (!empty($request->father_email) ? $request->father_email : null);
-            if ($parentEmail && $isNewParent) {
+            $motherEmail = !empty($request->mother_email) ? $request->mother_email : null;
+            $fatherEmail = !empty($request->father_email) ? $request->father_email : null;
+            
+            if (($motherEmail || $fatherEmail) && $isNewParent) {
                 // Check if user account already exists for this parent
                 $existingUser = DB::table('user')->where('UserID', $parentID)->first();
                 
@@ -135,19 +137,44 @@ class manageRegistrationController extends Controller
                         'updated_at' => now(),
                     ]);
                     
-                    // Send email to parent with temporary password
-                    try {
-                        $parentName = !empty($request->mother_name) ? $request->mother_name : (!empty($request->father_name) ? $request->father_name : 'Parent');
-                        Mail::to($parentEmail)->send(new ParentRegistrationMail(
-                            $parentName,
-                            $parentID,
-                            $parentEmail,
-                            $temporaryPassword,
-                            $request->child_full_name
-                        ));
-                    } catch (\Exception $emailError) {
-                        // Log email error but don't fail the registration
-                        \Log::error('Failed to send parent registration email: ' . $emailError->getMessage());
+                    // Send email to mother if email provided
+                    if ($motherEmail) {
+                        try {
+                            $motherName = !empty($request->mother_name) ? $request->mother_name : 'Parent';
+                            Mail::to($motherEmail)->send(new ParentRegistrationMail(
+                                $motherName,
+                                $parentID,
+                                $motherEmail,
+                                $temporaryPassword,
+                                $request->child_full_name
+                            ));
+                            \Log::info('✅ Parent registration email sent to mother', [
+                                'ParentID' => $parentID,
+                                'Email' => $motherEmail
+                            ]);
+                        } catch (\Exception $emailError) {
+                            \Log::error('Failed to send parent registration email to mother: ' . $emailError->getMessage());
+                        }
+                    }
+                    
+                    // Send email to father if email provided
+                    if ($fatherEmail) {
+                        try {
+                            $fatherName = !empty($request->father_name) ? $request->father_name : 'Parent';
+                            Mail::to($fatherEmail)->send(new ParentRegistrationMail(
+                                $fatherName,
+                                $parentID,
+                                $fatherEmail,
+                                $temporaryPassword,
+                                $request->child_full_name
+                            ));
+                            \Log::info('✅ Parent registration email sent to father', [
+                                'ParentID' => $parentID,
+                                'Email' => $fatherEmail
+                            ]);
+                        } catch (\Exception $emailError) {
+                            \Log::error('Failed to send parent registration email to father: ' . $emailError->getMessage());
+                        }
                     }
                 }
             }
@@ -665,8 +692,10 @@ class manageRegistrationController extends Controller
                             ];
                             
                             // Check if existing parent has user account, if not create one
-                            $parentEmail = !empty($row['mEmail']) ? $row['mEmail'] : (!empty($row['fEmail']) ? $row['fEmail'] : null);
-                            if ($parentEmail) {
+                            $mEmail = !empty($row['mEmail']) ? $row['mEmail'] : (!empty($existingParent->MEmail) ? $existingParent->MEmail : null);
+                            $fEmail = !empty($row['fEmail']) ? $row['fEmail'] : (!empty($existingParent->FEmail) ? $existingParent->FEmail : null);
+                            
+                            if ($mEmail || $fEmail) {
                                 $existingUser = DB::table('user')->where('UserID', $parentID)->first();
                                 if (!$existingUser) {
                                     // Existing parent but no user account - create one and send email
@@ -680,17 +709,32 @@ class manageRegistrationController extends Controller
                                         'updated_at' => $now,
                                     ];
                                     
-                                    $emailsToQueue[] = [
-                                        'email' => $parentEmail,
-                                        'parentName' => !empty($existingParent->MotherName) ? $existingParent->MotherName : (!empty($existingParent->FatherName) ? $existingParent->FatherName : 'Parent'),
-                                        'parentID' => $parentID,
-                                        'password' => $temporaryPassword,
-                                        'childName' => $row['childFullName'],
-                                    ];
+                                    // Send email to mother if email provided
+                                    if ($mEmail) {
+                                        $emailsToQueue[] = [
+                                            'email' => $mEmail,
+                                            'parentName' => !empty($existingParent->MotherName) ? $existingParent->MotherName : 'Parent',
+                                            'parentID' => $parentID,
+                                            'password' => $temporaryPassword,
+                                            'childName' => $row['childFullName'],
+                                        ];
+                                    }
+                                    
+                                    // Send email to father if email provided
+                                    if ($fEmail) {
+                                        $emailsToQueue[] = [
+                                            'email' => $fEmail,
+                                            'parentName' => !empty($existingParent->FatherName) ? $existingParent->FatherName : 'Parent',
+                                            'parentID' => $parentID,
+                                            'password' => $temporaryPassword,
+                                            'childName' => $row['childFullName'],
+                                        ];
+                                    }
                                     
                                     \Log::info('Creating user account for existing parent without account', [
                                         'ParentID' => $parentID,
-                                        'Email' => $parentEmail
+                                        'MotherEmail' => $mEmail,
+                                        'FatherEmail' => $fEmail
                                     ]);
                                 }
                             }
@@ -720,8 +764,10 @@ class manageRegistrationController extends Controller
                             $isNewParent = true;
                             
                             // Prepare user account if email provided
-                            $parentEmail = !empty($row['mEmail']) ? $row['mEmail'] : (!empty($row['fEmail']) ? $row['fEmail'] : null);
-                            if ($parentEmail) {
+                            $mEmail = !empty($row['mEmail']) ? $row['mEmail'] : null;
+                            $fEmail = !empty($row['fEmail']) ? $row['fEmail'] : null;
+                            
+                            if ($mEmail || $fEmail) {
                                 $temporaryPassword = PasswordHelper::generateTemporaryPassword(8);
                                 $usersToInsert[] = [
                                     'UserID' => $parentID,
@@ -732,13 +778,27 @@ class manageRegistrationController extends Controller
                                     'updated_at' => $now,
                                 ];
                                 
-                                $emailsToQueue[] = [
-                                    'email' => $parentEmail,
-                                    'parentName' => !empty($row['motherName']) ? $row['motherName'] : (!empty($row['fatherName']) ? $row['fatherName'] : 'Parent'),
-                                    'parentID' => $parentID,
-                                    'password' => $temporaryPassword,
-                                    'childName' => $row['childFullName'],
-                                ];
+                                // Send email to mother if email provided
+                                if ($mEmail) {
+                                    $emailsToQueue[] = [
+                                        'email' => $mEmail,
+                                        'parentName' => !empty($row['motherName']) ? $row['motherName'] : 'Parent',
+                                        'parentID' => $parentID,
+                                        'password' => $temporaryPassword,
+                                        'childName' => $row['childFullName'],
+                                    ];
+                                }
+                                
+                                // Send email to father if email provided
+                                if ($fEmail) {
+                                    $emailsToQueue[] = [
+                                        'email' => $fEmail,
+                                        'parentName' => !empty($row['fatherName']) ? $row['fatherName'] : 'Parent',
+                                        'parentID' => $parentID,
+                                        'password' => $temporaryPassword,
+                                        'childName' => $row['childFullName'],
+                                    ];
+                                }
                             }
                         } else {
                             $parentID = $parentMap[$parentKey];
