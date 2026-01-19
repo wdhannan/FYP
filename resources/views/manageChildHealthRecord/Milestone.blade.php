@@ -281,7 +281,6 @@
                     <thead>
                         <tr>
                             <th>MILESTONE TYPE</th>
-                            <th>RECORDED DATE</th>
                             <th>REMARKS</th>
                         </tr>
                     </thead>
@@ -292,7 +291,6 @@
                                 <option value="">-- Select Child First --</option>
                             </select>
                         </td>
-                        <td><input type="date" name="recorded_date[]" required disabled></td>
                         <td><textarea name="notes[]" placeholder="Add remarks" disabled></textarea></td>
                     </tr>
                     </tbody>
@@ -336,7 +334,6 @@
                             <tr>
                                 <th>CHILD NAME</th>
                                 <th>MILESTONE TYPE</th>
-                                <th>RECORDED DATE</th>
                                 <th>REMARKS</th>
                             </tr>
                         </thead>
@@ -345,15 +342,6 @@
                             <tr>
                                 <td>{{ $milestone->ChildName ?? 'N/A' }}</td>
                                 <td>{{ $milestone->MilestoneType ?? 'N/A' }}</td>
-                                <td>
-                                    @if(!empty($milestone->RecordedDate))
-                                        {{ \Carbon\Carbon::parse($milestone->RecordedDate)->format('F j, Y') }}
-                                    @elseif(!empty($milestone->created_at))
-                                        {{ \Carbon\Carbon::parse($milestone->created_at)->format('F j, Y') }}
-                                    @else
-                                        N/A
-                                    @endif
-                                </td>
                                 <td>{{ $milestone->Notes ?? '-' }}</td>
                             </tr>
                         @endforeach
@@ -426,7 +414,6 @@
             html += `
                     </select>
                 </td>
-                <td><input type="date" name="recorded_date[]" required></td>
                 <td><textarea name="notes[]" placeholder="Add remarks"></textarea></td>
             `;
             

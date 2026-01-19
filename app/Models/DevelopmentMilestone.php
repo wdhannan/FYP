@@ -17,7 +17,6 @@ class DevelopmentMilestone extends Model
         'MilestoneID',
         'ChildID',
         'MilestoneType',
-        'RecordedDate',
         'Notes',
     ];
 }

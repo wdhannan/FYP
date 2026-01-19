@@ -563,8 +563,6 @@ class manageChildHealthRecordController extends Controller
             ],
             'milestone_type' => 'required|array',
             'milestone_type.*' => 'required|string|max:255',
-            'recorded_date' => 'required|array',
-            'recorded_date.*' => 'required|date',
             'notes' => 'nullable|array',
             'notes.*' => 'nullable|string',
         ]);
@@ -580,7 +578,6 @@ class manageChildHealthRecordController extends Controller
             }
             
             $milestoneTypes = $request->milestone_type;
-            $recordedDates = $request->recorded_date;
             $notes = $request->notes ?? [];
             
             $successCount = 0;
@@ -605,7 +602,6 @@ class manageChildHealthRecordController extends Controller
                     'MilestoneID' => $milestoneID,
                     'ChildID' => $childId,
                     'MilestoneType' => $milestoneType,
-                    'RecordedDate' => !empty($recordedDates[$index]) ? $recordedDates[$index] : null,
                     'Notes' => $notes[$index] ?? null,
                 ]);
                 
