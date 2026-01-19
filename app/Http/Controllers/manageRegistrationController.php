@@ -678,8 +678,6 @@ class manageRegistrationController extends Controller
                                 'FPhoneNumber' => $row['fPhoneNumber'],
                                 'FEmail' => $row['fEmail'],
                                 'FIdentificationNumber' => $row['fIdentificationNumber'],
-                                'created_at' => $now,
-                                'updated_at' => $now,
                             ];
                             
                             $isNewParent = true;
