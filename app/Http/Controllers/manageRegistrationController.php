@@ -663,6 +663,37 @@ class manageRegistrationController extends Controller
                                 'MotherName' => $existingParent->MotherName ?? '',
                                 'FatherName' => $existingParent->FatherName ?? ''
                             ];
+                            
+                            // Check if existing parent has user account, if not create one
+                            $parentEmail = !empty($row['mEmail']) ? $row['mEmail'] : (!empty($row['fEmail']) ? $row['fEmail'] : null);
+                            if ($parentEmail) {
+                                $existingUser = DB::table('user')->where('UserID', $parentID)->first();
+                                if (!$existingUser) {
+                                    // Existing parent but no user account - create one and send email
+                                    $temporaryPassword = PasswordHelper::generateTemporaryPassword(8);
+                                    $usersToInsert[] = [
+                                        'UserID' => $parentID,
+                                        'PasswordHash' => $temporaryPassword,
+                                        'role' => 'parent',
+                                        'must_change_password' => true,
+                                        'created_at' => $now,
+                                        'updated_at' => $now,
+                                    ];
+                                    
+                                    $emailsToQueue[] = [
+                                        'email' => $parentEmail,
+                                        'parentName' => !empty($existingParent->MotherName) ? $existingParent->MotherName : (!empty($existingParent->FatherName) ? $existingParent->FatherName : 'Parent'),
+                                        'parentID' => $parentID,
+                                        'password' => $temporaryPassword,
+                                        'childName' => $row['childFullName'],
+                                    ];
+                                    
+                                    \Log::info('Creating user account for existing parent without account', [
+                                        'ParentID' => $parentID,
+                                        'Email' => $parentEmail
+                                    ]);
+                                }
+                            }
                             break;
                         }
                     }
@@ -747,9 +778,15 @@ class manageRegistrationController extends Controller
                         
                         DB::commit();
                         
-                        // Step 6: Queue emails asynchronously (don't block response)
+                        // Step 6: Send emails to parents with login credentials
                         foreach ($emailsToQueue as $emailData) {
                             try {
+                                \Log::info('Sending parent registration email', [
+                                    'ParentID' => $emailData['parentID'],
+                                    'Email' => $emailData['email'],
+                                    'ChildName' => $emailData['childName']
+                                ]);
+                                
                                 if (config('queue.default') !== 'sync') {
                                     Mail::to($emailData['email'])->queue(new ParentRegistrationMail(
                                         $emailData['parentName'],
@@ -758,8 +795,12 @@ class manageRegistrationController extends Controller
                                         $emailData['password'],
                                         $emailData['childName']
                                     ));
+                                    \Log::info('Parent registration email queued successfully', [
+                                        'ParentID' => $emailData['parentID'],
+                                        'Email' => $emailData['email']
+                                    ]);
                                 } else {
-                                    // Send email (non-blocking in production with proper mail config)
+                                    // Send email immediately
                                     Mail::to($emailData['email'])->send(new ParentRegistrationMail(
                                         $emailData['parentName'],
                                         $emailData['parentID'],
@@ -767,9 +808,19 @@ class manageRegistrationController extends Controller
                                         $emailData['password'],
                                         $emailData['childName']
                                     ));
+                                    \Log::info('✅ Parent registration email sent successfully', [
+                                        'ParentID' => $emailData['parentID'],
+                                        'Email' => $emailData['email'],
+                                        'ParentName' => $emailData['parentName']
+                                    ]);
                                 }
                             } catch (\Exception $e) {
-                                \Log::error("Failed to send email for parent {$emailData['parentID']}: " . $e->getMessage());
+                                \Log::error("❌ Failed to send parent registration email", [
+                                    'ParentID' => $emailData['parentID'],
+                                    'Email' => $emailData['email'],
+                                    'Error' => $e->getMessage(),
+                                    'Trace' => $e->getTraceAsString()
+                                ]);
                             }
                         }
                         
