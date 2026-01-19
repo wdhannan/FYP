@@ -230,8 +230,24 @@ class manageAppointmentController extends Controller
             ]);
 
             // Send notification email to doctor
-            if ($doctor && $doctor->Email) {
+            $emailSent = false;
+            $emailError = null;
+            
+            if (!$doctor) {
+                \Log::warning('Doctor not found for appointment', ['DoctorID' => $request->doctor_id]);
+            } elseif (empty($doctor->Email)) {
+                \Log::warning('Doctor email is missing', [
+                    'DoctorID' => $request->doctor_id,
+                    'DoctorName' => $doctor->FullName ?? 'Unknown'
+                ]);
+            } else {
                 try {
+                    \Log::info('Attempting to send appointment request email to doctor', [
+                        'DoctorEmail' => $doctor->Email,
+                        'DoctorName' => $doctor->FullName,
+                        'AppointmentID' => $appointmentID
+                    ]);
+                    
                     Mail::to($doctor->Email)->send(new AppointmentRequestMail(
                         $doctor->FullName,
                         $child->FullName ?? 'Unknown',
@@ -240,14 +256,35 @@ class manageAppointmentController extends Controller
                         $appointmentID,
                         $nurse->FullName ?? 'Unknown'
                     ));
+                    
+                    $emailSent = true;
+                    \Log::info('✅ Appointment request email sent successfully to doctor', [
+                        'DoctorEmail' => $doctor->Email,
+                        'AppointmentID' => $appointmentID
+                    ]);
                 } catch (\Exception $e) {
-                    \Log::error('Failed to send appointment request email to doctor: ' . $e->getMessage());
-                    // Don't fail the appointment creation if email fails
+                    $emailError = $e->getMessage();
+                    \Log::error('❌ Failed to send appointment request email to doctor', [
+                        'DoctorEmail' => $doctor->Email,
+                        'DoctorID' => $request->doctor_id,
+                        'AppointmentID' => $appointmentID,
+                        'Error' => $e->getMessage(),
+                        'Trace' => $e->getTraceAsString()
+                    ]);
                 }
             }
 
+            $successMessage = '✅ Appointment booked successfully!';
+            if ($emailSent) {
+                $successMessage .= ' Email notification sent to doctor.';
+            } elseif ($emailError) {
+                $successMessage .= ' ⚠️ Email notification could not be sent. Please check doctor email configuration.';
+            } elseif (!$doctor || empty($doctor->Email)) {
+                $successMessage .= ' ⚠️ Doctor email not found. Email notification not sent.';
+            }
+
             return redirect()->route('appointment.status')
-                ->with('success', '✅ Appointment booked successfully!');
+                ->with('success', $successMessage);
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('Validation error in storeBooking', [
                 'errors' => $e->errors(),
