@@ -623,6 +623,7 @@ class manageRegistrationController extends Controller
                 
                 // Step 4: Process rows and group by parent
                 $parentMap = []; // Maps IC to ParentID
+                $parentInfoMap = []; // Maps ParentID to parent info (for response)
                 $parentsToInsert = [];
                 $childrenToInsert = [];
                 $usersToInsert = [];
@@ -657,6 +658,11 @@ class manageRegistrationController extends Controller
                         }
                         if ($match) {
                             $parentID = $existingParent->ParentID;
+                            // Store parent info for response
+                            $parentInfoMap[$parentID] = [
+                                'MotherName' => $existingParent->MotherName ?? '',
+                                'FatherName' => $existingParent->FatherName ?? ''
+                            ];
                             break;
                         }
                     }
@@ -768,13 +774,33 @@ class manageRegistrationController extends Controller
                         }
                         
                         $successCount = count($childrenToInsert);
-                        $children = array_map(function($item) {
+                        
+                        // Create a map of ParentID to parent info for response
+                        $parentInfoMap = [];
+                        foreach ($parentsToInsert as $parent) {
+                            $parentInfoMap[$parent['ParentID']] = [
+                                'MotherName' => $parent['MotherName'],
+                                'FatherName' => $parent['FatherName'] ?? null,
+                            ];
+                        }
+                        // Also add existing parents
+                        foreach ($existingParents as $parent) {
+                            $parentInfoMap[$parent->ParentID] = [
+                                'MotherName' => $parent->MotherName,
+                                'FatherName' => $parent->FatherName ?? null,
+                            ];
+                        }
+                        
+                        $children = array_map(function($item) use ($parentInfoMap) {
+                            $parentInfo = $parentInfoMap[$item['ParentID']] ?? ['MotherName' => '', 'FatherName' => ''];
                             return [
                                 'ChildID' => $item['ChildID'],
                                 'FullName' => $item['FullName'],
                                 'DateOfBirth' => $item['DateOfBirth'],
                                 'Gender' => $item['Gender'],
                                 'ParentID' => $item['ParentID'],
+                                'MotherName' => $parentInfo['MotherName'] ?? '',
+                                'FatherName' => $parentInfo['FatherName'] ?? '',
                             ];
                         }, $childrenToInsert);
                         
